@@ -1,0 +1,141 @@
+<?php
+
+/*
+ * Classe Concert que representa un concert. Un concert s'identifica per 
+ * un identificador (idConcert), el nom del concert, la data en que es fa, 
+ * per un artista (objecte de la classe Artista) que el fa  i per una ciutat 
+ * (objecte de la classe Ciutat) en què es fa.
+ */
+
+/* inculdes necessàris (0,25 punts) */
+include 'Artista.php';
+include 'Ciutat.php';
+
+class Concert {
+    /* Declaració d'atributs (0,25 punts) */
+
+    private $id;
+    private $data;
+    private $artista;
+    private $ciutat;
+
+    function __construct($pData, $pArtista, $pCiutat) {
+        /* Mètode constructor que assigna els valors passats com a paràmetre als atributs, 
+         * menys en el cas de l'identificador que li assigna null, ja que aquest se li ha
+         * d'assignar el valor de idConcert corresponent de la taula concerts, quan el 
+         * concert es registri en la base de dades. (0,5 punts) */
+        $this->id = null;
+        $this->data = $pData;
+        $this->artista = $pArtista;
+        $this->ciutat = $pCiutat;
+    }
+
+    /* Mètodes accessors: els necessaris (0,5 punts) */
+
+    function setId($pId) {
+        $this->id = $pId;
+    }
+
+    function getData() {
+        return $this->data;
+    }
+
+    function informacioConcerts($connexio) {
+        /* Retorna un vector amb tota la informació de la taula concerts. Per 
+         * cada registre de la taula concerts heu de generar un objecte concert
+         * que seran els que guardareu dins del vector. Penseu que dos dels atributs 
+         * d'un objecte concert, són objectes que també heu de crear. 
+         * La connexió necessària a la base de dades es passa per paràmetre.
+         * (2 punts) */
+
+        $consulta = $connexio->query("select * from concerts");
+
+        //Consultem concerts
+        while ($registre = $consulta->fetch_array(MYSQLI_ASSOC)) {
+
+            //Consultem artista del concert actual
+            $consultaArtista = $connexio->query("select * from artistes where idArtista='" . $registre["idArtista"] . "'");
+            $artista = $consultaArtista->fetch_array(MYSQLI_ASSOC);
+            $nouArtista = new Artista($artista["nom"], $artista["representant"], $artista["email"], $artista["telefon"]);
+            $nouArtista->setId($artista["idArtista"]);
+
+
+            //Consultem ciutat del concert
+            $consultaCiutat = $connexio->query("select * from ciutats where idCiutat='" . $registre["idCiutat"] . "'");
+            $ciutat = $consultaCiutat->fetch_array(MYSQLI_ASSOC);
+            $novaCiutat = new Ciutat($ciutat["nom"], $ciutat["pais"]);
+            $novaCiutat->setId($ciutat["idCiutat"]);
+
+
+            //Instànciem concert
+            $concert = new Concert($registre["data"], $nouArtista, $novaCiutat);
+            $concert->setId($registre["idConcert"]);
+
+            //Afegim al vector de concerts
+            $concerts[] = $concert;
+        }
+
+        return $concerts;
+    }
+
+    function mostrarConcert($idConcert, $connexio) {
+        /* Mostrarà per pantalla les dades d'un concert donat. Aquest mètode 
+         * imprimira per pantalla el nom de l'artista, la data i nom de la ciutat 
+         * en que es fa. L'informació necessari l'heu de consultar de la base de dades, 
+         * no del vector de concerts.
+         * La connexió necessària a la base de dades també es passa per paràmetre.
+         * (2 punts) */
+
+        $consulta = $connexio->query("select co.data, a.nom, ci.nom  from concerts co, artistes a, ciutats ci where co.idConcert='$idConcert'and co.idArtista=a.idArtista and co.idCiutat=ci.idCiutat");
+
+        $concert = $consulta->fetch_array(MYSQLI_ASSOC);
+        echo $concert["co.data"] . " - " . $concert["a.nom"] . " - " . $concert["ci.nom"];
+    }
+
+    function guardarConcerts($vectorConcerts) {
+        /* Guarda en un fitxer concerts.txt, que es trobarà en el mateix directori
+         * on guardem l'script guardarConcert, la informació del vector que ens 
+         * retornarà el mètode  informacioConcerts i què passem per paràmetre. 
+         * Si el fitxer no està buit, el mètode sobreescriurà tota la informació 
+         * que es trobi en el fitxer.
+         * Cada concert s'ha de guardar en una línia del fitxer. En cada línia,
+         * el primer que s'ha de guardar és l'identificador del concert i a continuació 
+         * tots els valors dels atributs separats per un espai. Recordeu que hi 
+         * ha atributs que són objectes, i per tant, haureu de mostrar els valors 
+         * dels atributs d'aquests objectes.
+         * (2,5 punts) */
+
+        //Recooregut del fitxer per construir el contingut
+        for ($i = 0; $i < count($vectorConcerts); $i++) {
+            $artista = $vectorConcerts[$i]->artista;
+            $ciutat = $vectorConcerts[$i]->ciutat;
+            $contingut.=$vectorConcerts[$i]->id . " " . $vectorConcerts[$i]->data . " " . $artista->getId() . " " . $artista->getNom() . " " . $artista->getRepresentant() . " " . $artista->getEmail() . " " . $artista->getTelefon() . " " . $ciutat->getId() . " " . $ciutat->getNom() . " " . $ciutat->getPais() . "\r\n";
+        }
+        //Sobreescribim fitxer
+        file_put_contents("concerts.txt", $contingut);
+    }
+
+    function mostrarConcertFitxers($idConcert) {
+        /* Mostra per pantalla el contingut que hi ha en el fitxer concerts.txt 
+         * d'un concert donat.
+         * (2 punts) */
+
+        //Obrim fitxer per lectura
+        $fitxerObert = fopen("concerts.txt", "r")or die("El fitxer no s'ha obert.");
+        $fitxerTrobat = false; //Semàfor per sortir de la cerca si trobem la línia
+        //recorregut del fitxer línia per línia buscant la línia del concert
+        while (!feof($fitxerObert) || !$fitxerTrobat) {
+            $linia = fgets($fitxerObert);
+            if (strtok($linia, " ") == $idConcert) {
+                echo $linia;
+                $fitxerTrobat = true;
+            }
+        }
+
+        //Tanquem fitxer
+        close($fitxerObert);
+    }
+
+}
+
+?>
